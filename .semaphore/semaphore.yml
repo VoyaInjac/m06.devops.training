@@ -45,7 +45,7 @@ blocks:
             - chmod -R +x .terraform/
             - terraform validate
             - terraform apply -auto-approve
-            - artifact push workflow terraform.tfstate
+            - artifact push workflow terraform.tfstate --force
 
   - name: "Use Bucket"
     dependencies: ["Deploy"]
@@ -60,6 +60,39 @@ blocks:
             - aws s3 cp README.md s3://vinjac-devops-training-bucket/
             - aws s3 ls s3://vinjac-devops-training-bucket
             - aws s3 rm s3://vinjac-devops-training-bucket/README.md
+
+  - name: "Deploy EC2"
+    dependencies: ["Initialize"]
+    task:
+      secrets:
+        - name: localstack
+      jobs:
+        - name: "Terraform Apply EC2"
+          commands:
+            - checkout
+            - cd 2-terraform-ec2
+            - artifact pull workflow .terraform --force
+            - artifact pull workflow .terraform.lock.hcl --force
+            - chmod -R +x .terraform/
+            - terraform validate
+            - terraform apply -auto-approve
+            - artifact push workflow terraform.tfstate --force
+
+  - name: "Destroy EC2"
+    dependencies: ["Deploy EC2"]
+    task:
+      secrets:
+        - name: localstack
+      jobs:
+        - name: "Terraform Destroy EC2"
+          commands:
+            - checkout
+            - cd 2-terraform-ec2
+            - artifact pull workflow .terraform --force
+            - artifact pull workflow .terraform.lock.hcl --force
+            - artifact pull workflow terraform.tfstate --force
+            - chmod -R +x .terraform/
+            - terraform destroy -auto-approve
 
   - name: "Destroy"
     dependencies: ["Use Bucket"]
