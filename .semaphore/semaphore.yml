@@ -78,6 +78,59 @@ blocks:
             - terraform apply -auto-approve
             - artifact push workflow terraform.tfstate --force
 
+  - name: "Deploy DynamoDB"
+    dependencies: ["Initialize"]
+    task:
+      secrets:
+        - name: localstack
+      jobs:
+        - name: "Terraform Apply DynamoDB"
+          commands:
+            - checkout
+            - cd 3-terraform-dynamodb
+            - artifact pull workflow .terraform --force
+            - artifact pull workflow .terraform.lock.hcl --force
+            - chmod -R +x .terraform/
+            - terraform validate
+            - terraform apply -auto-approve
+            - artifact push workflow terraform.tfstate --force
+
+  - name: "Use DynamoDB"
+    dependencies: ["Deploy DynamoDB"]
+    task:
+      secrets:
+        - name: localstack
+      jobs:
+        - name: "DynamoDB Operations"
+          commands:
+            - aws dynamodb list-tables
+            - aws dynamodb describe-table --table-name vinjac-devops-training-table
+            - |
+              aws dynamodb put-item \
+                --table-name vinjac-devops-training-table \
+                --item '{
+                    "user_id": {"S": "u1"},
+                    "name": {"S": "Alice"},
+                    "email": {"S": "alice@example.com"}
+                  }'
+            - aws dynamodb scan --table-name vinjac-devops-training-table
+
+  - name: "Destroy DynamoDB"
+    dependencies: ["Use DynamoDB"]
+    task:
+      secrets:
+        - name: localstack
+      jobs:
+        - name: "Terraform Destroy DynamoDB"
+          commands:
+            - checkout
+            - cd 3-terraform-dynamodb
+            - artifact pull workflow .terraform --force
+            - artifact pull workflow .terraform.lock.hcl --force
+            - artifact pull workflow terraform.tfstate --force
+            - chmod -R +x .terraform/
+            - terraform destroy -auto-approve
+
   - name: "Destroy EC2"
     dependencies: ["Deploy EC2"]
     task:
